@@ -1,0 +1,6 @@
+{
+  "name": "OpenZeta",
+  "description": "Local-first AI character dialogue application with custom BYOK endpoints, plot control, and smart replies.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

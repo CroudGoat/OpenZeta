@@ -1,11 +1,135 @@
-<div align="center">
+# OpenZeta
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+OpenZeta は、大規模言語モデル（LLM）を活用したキャラクター対話およびロールプレイ向けのローカルファースト Web アプリケーションです。AIチャットアプリであるZetaにインスパイアされました。ブラウザ内 IndexedDB による完全なクライアントサイド永続化を採用しており、外部データベースやバックエンド基盤を必要とせずに独立して動作します。
 
-  <h1>Built with AI Studio</h2>
+---
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## アーキテクチャ概要
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+Next.js App Router をベースとしたモジュラーなクライアント・サーバーハイブリッド構成を採用しています。
 
-</div>
+```
+Client (Browser)
+├── React 19 UI Components (Streaming / Markdown Rendering)
+├── Local State & Event Loop (requestAnimationFrame Throttle)
+├── Dexie.js / IndexedDB (キャラクター定義, 会話ログ, 設定)
+└── Direct LLM Client Interface (クライアント直接通信モード)
+
+Server (Next.js API Routes)
+├── /api/chat (SSE ストリーミングプロキシ / サーバーサイド Gemini API 統合)
+└── /api/smart-reply (コンテキスト考慮型 Structured Outputs)
+```
+
+- **プライバシー保護とローカルファースト設計**: 会話履歴、キャラクター設定、アバター画像、接続設定はすべてユーザーのブラウザ内（Dexie.js / IndexedDB）に直接保存・永続化されます。
+- **高効率ストリーミングパイプライン**: レスポンスは Server-Sent Events（SSE）経由でストリーミングされ、`requestAnimationFrame` により約60fps周期でバッチ更新されます。これにより、高頻度のトークン受信時でも UI のフレームドロップを防止します。
+- **コンポーネントの完全メモ化**: 過去のチャットログは `React.memo` とカスタム比較関数によって保護され、最新メッセージのストリーミング更新時における不要な再レンダリングを完全に遮断します。
+
+---
+
+## 主要機能
+
+### 1. 対話・ロールプレイエンジン
+- **マルチロールセグメンテーション**: `@話者名:` や `@ナレーター:` などのタグプレフィックスを構文解析し、独立した吹き出しおよび地の文ブロックとして描画。
+- **アクション構文（地の文・行動描写）レンダリング**: `*行動*` マーカーを自動認識し、セリフ内の非言語的動作や心情描写を視覚的に整理して整形。
+- **メッセージ分岐・バリアント管理**: 応答の再生成や、過去に生成した複数バリエーション間の切り替えに対応。
+
+### 2. シナリオ・プロット動的注入
+- **動的コンテキスト注入**: 状況プロンプトやプロット進行フラグを対話中にリアルタイムでシステムコンテキストへ直接注入。
+- **プリセットシステム**: 一般的なシチュエーションテンプレートを内蔵し、ユーザー独自のカスタムプロット作成・保存に対応。
+
+### 3. マルチプロバイダー LLM 統合
+OpenAI 互換 API および主要 LLM プロバイダーに対応：
+- **カスタムエンドポイント**: クラウドでもローカルでも、エンドポイントURLとAPIキーさえあればどんなプロバイダでも接続できます
+- **接続診断機能**: API キーの妥当性およびエンドポイントの疎通確認テスト機能を内蔵。
+
+### 4. スマートリプライ支援
+- **コンテキスト適応型入力提案**: 直前の会話履歴とキャラクター設定を解析し、文脈に適した返答候補を動的に生成。
+
+### 5. トークン使用量解析
+- **メッセージ別メトリクス**: 各ターンのプロンプト・完了トークン数を個別表示。
+- **セッション集計**: 会話全体の総トークン消費量およびアクティブなモデル情報を可視化。
+
+---
+
+## 技術スタック
+
+| 区分 | 採用技術 |
+|---|---|
+| フレームワーク | Next.js 15 (App Router, React 19) |
+| 開発言語 | TypeScript |
+| スタイリング | Tailwind CSS v4 |
+| データベース | Dexie.js (IndexedDB) |
+| アイコン | Lucide React |
+| Markdown パーサー | react-markdown |
+
+---
+
+## セットアップ手順
+
+### 必要要件
+- Node.js 18.18.0 以上
+- npm 9.0.0 以上
+
+### インストール手順
+
+1. **リポジトリのクローンと依存関係のインストール:**
+   ```bash
+   git clone <repository-url>
+   cd openzeta
+   npm install
+   ```
+
+2. **環境変数の設定（任意）:**
+   サーバーサイドで Gemini API を利用する場合は、プロジェクトルートに `.env.local` を作成してください：
+   ```env
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+   *※ API キーや Base URL は、Web 画面上の設定モーダルから直接設定することも可能です。*
+
+3. **開発サーバーの起動:**
+   ```bash
+   npm run dev
+   ```
+   ブラウザで [http://localhost:3000](http://localhost:3000) を開きます。
+
+4. **本番ビルドと起動:**
+   ```bash
+   npm run build
+   npm start
+   ```
+
+---
+
+## ディレクトリ構成
+
+```
+├── app/
+│   ├── api/
+│   │   ├── chat/           # SSE ストリーミングエンドポイント / API プロキシ
+│   │   └── smart-reply/    # 構造化返答サジェストエンドポイント
+│   ├── layout.tsx          # ルートレイアウト / フォント定義
+│   └── page.tsx            # メインアプリケーションエントリーポイント
+├── components/
+│   ├── chat/               # チャット領域、メッセージ項目、ヘッダー、入力バー
+│   ├── CharacterModal.tsx  # キャラクター作成・編集モーダル
+│   ├── SettingsModal.tsx   # LLM プロバイダーおよびユーザー設定モーダル
+│   └── Sidebar.tsx         # キャラクター一覧・管理サイドバー
+├── lib/
+│   ├── db.ts               # Dexie.js スキーマ定義・CRUD ヘルパー
+│   ├── llm-client.ts       # 統合 LLM クライアント・ストリーム制御
+│   └── message-parser.ts   # ロールプレイ構文・セグメントパーサー
+└── public/                 # 静的アセット
+```
+
+---
+
+## コントリビューションについて
+本プロジェクトは **「Open Source, not Open Contribution」** の形態をとっています。
+
+- **利用とフォークの自由**: MIT ライセンスの下で自由にフォーク、改変、利用していただけます。
+- **Pull Request について**: プロジェクトの一貫性と品質を保つため、外部からの Pull Request やコードの直接提供は受け付けていません。機能追加や変更が必要な場合は、各自のリポジトリへフォークしてご利用ください。
+- **フィードバック**: バグ報告やディスカッションは Issue にて歓迎します。
+
+## ライセンス
+
+本プロジェクトは MIT ライセンスの下で公開されています。
