@@ -1,69 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import {
+  externalFetchErrorStatus,
+  fetchExternalChatCompletion,
+  isExternalEndpoint,
+  parseChatRequestBody,
+  RequestValidationError,
+} from '@/lib/external-chat';
 
-interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+const SSE_HEADERS: Record<string, string> = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache',
+  Connection: 'keep-alive',
+};
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  let payload;
   try {
-    const body = await req.json();
-    const {
-      messages,
-      baseUrl,
-      apiKey,
-      modelName = 'gemini-2.5-flash',
-      temperature = 0.7,
-    } = body as {
-      messages: ChatMessage[];
-      baseUrl?: string;
-      apiKey?: string;
-      modelName?: string;
-      temperature?: number;
-    };
+    const body: unknown = await req.json();
+    payload = parseChatRequestBody(body);
+  } catch (error) {
+    const message =
+      error instanceof RequestValidationError
+        ? error.message
+        : 'Invalid JSON in request body.';
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 
-    // If a custom external endpoint is specified (not empty, not default /api/chat)
-    if (baseUrl && baseUrl !== '/api/chat' && !baseUrl.includes('/api/chat')) {
-      // Forward to custom OpenAI-compatible endpoint
-      const targetUrl = baseUrl.endsWith('/chat/completions')
-        ? baseUrl
-        : `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const { messages, baseUrl, apiKey, modelName, temperature } = payload;
 
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-        },
-        body: JSON.stringify({
-          model: modelName || 'gpt-4o-mini',
-          messages,
-          temperature,
-          stream: true,
-          stream_options: { include_usage: true },
-        }),
+  // Branch 1: forward to a user-supplied OpenAI-compatible endpoint (BYOK)
+  if (isExternalEndpoint(baseUrl)) {
+    let response: Response;
+    try {
+      response = await fetchExternalChatCompletion({
+        baseUrl,
+        apiKey,
+        model: modelName || 'gpt-4o-mini',
+        messages,
+        temperature,
+        stream: true,
+        timeoutMs: 120_000,
       });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        return NextResponse.json(
-          { error: `External API error (${response.status}): ${errText}` },
-          { status: response.status }
-        );
-      }
-
-      // Proxy the streaming SSE body directly
-      return new Response(response.body, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        },
-      });
+    } catch (error) {
+      const { status, message } = externalFetchErrorStatus(error);
+      return NextResponse.json({ error: message }, { status });
     }
 
-    // Default: Use server-side Gemini via @google/genai SDK
+    if (!response.ok) {
+      const errText = (await response.text().catch(() => '')).slice(0, 500);
+      return NextResponse.json(
+        { error: `External API error (${response.status})${errText ? `: ${errText}` : ''}` },
+        { status: response.status }
+      );
+    }
+
+    // Proxy the streaming SSE body directly
+    return new Response(response.body, { headers: SSE_HEADERS });
+  }
+
+  // Branch 2: built-in Gemini via @google/genai SDK
+  try {
     const geminiKey = process.env.GEMINI_API_KEY || apiKey;
     if (!geminiKey) {
       return NextResponse.json(
@@ -78,29 +78,23 @@ export async function POST(req: NextRequest) {
     const systemMessage = messages.find((m) => m.role === 'system')?.content || '';
     const chatHistory = messages.filter((m) => m.role !== 'system');
 
-    // Build Gemini contents structure
     const contents = chatHistory.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
 
-    // If contents is empty, add a default user message
     if (contents.length === 0) {
       contents.push({ role: 'user', parts: [{ text: 'こんにちは' }] });
     }
 
-    // Use streaming
     const geminiModel = modelName.includes('gemini') ? modelName : 'gemini-2.5-flash';
     const streamConfig: Record<string, unknown> = {
       systemInstruction: systemMessage || undefined,
       temperature,
     };
 
-    // If using gemini 2.0 flash thinking or gemini 2.5 thinking models, set thinkingBudget to 0 or disable thinking output if desired
     if (geminiModel.includes('thinking')) {
-      streamConfig.thinkingConfig = {
-        thinkingBudget: 0,
-      };
+      streamConfig.thinkingConfig = { thinkingBudget: 0 };
     }
 
     const streamResult = await ai.models.generateContentStream({
@@ -113,30 +107,25 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          let lastUsageMetadata: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
+          let lastUsageMetadata: {
+            promptTokenCount?: number;
+            candidatesTokenCount?: number;
+            totalTokenCount?: number;
+          } | null = null;
 
           for await (const chunk of streamResult) {
             if (chunk.usageMetadata) {
               lastUsageMetadata = chunk.usageMetadata;
             }
-
             const text = chunk.text || '';
             if (text) {
-              // Format as OpenAI SSE event
               const data = JSON.stringify({
-                choices: [
-                  {
-                    delta: { content: text },
-                    index: 0,
-                    finish_reason: null,
-                  },
-                ],
+                choices: [{ delta: { content: text }, index: 0, finish_reason: null }],
               });
               controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             }
           }
 
-          // If usage metadata is available from Gemini, emit usage event
           if (lastUsageMetadata) {
             const usageData = JSON.stringify({
               choices: [],
@@ -158,13 +147,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
+    return new Response(stream, { headers: SSE_HEADERS });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('API /api/chat error:', err);

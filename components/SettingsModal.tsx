@@ -21,8 +21,9 @@ import {
   Users,
   Info,
 } from 'lucide-react';
-import { UserSettings, saveSettings, db, DEFAULT_SETTINGS } from '@/lib/db';
+import { Character, Message, UserSettings, saveSettings, db, DEFAULT_SETTINGS } from '@/lib/db';
 import { useModalDismiss } from '@/hooks/use-modal-dismiss';
+import { downloadJsonFile } from '@/lib/utils';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -158,19 +159,47 @@ function SettingsFormModal({
       settings: setts,
     };
 
-    const dataUri = `data:text/json;charset=utf-8,${encodeURIComponent(
-      JSON.stringify(backup, null, 2)
-    )}`;
-    const anchor = document.createElement('a');
-    anchor.setAttribute('href', dataUri);
-    anchor.setAttribute(
-      'download',
-      `openzeta-full-backup-${new Date().toISOString().slice(0, 10)}.json`
+    downloadJsonFile(
+      `openzeta-full-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      backup
     );
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
   };
+
+  /**
+   * Minimal schema validation for full-backup files. Rejects anything that
+   * does not look like an OpenZeta backup so a malformed/hostile file can
+   * never be silently bulk-loaded into IndexedDB.
+   */
+  function validateBackupShape(backup: unknown): void {
+    if (typeof backup !== 'object' || backup === null || Array.isArray(backup)) {
+      throw new Error('無効なバックアップファイルです。');
+    }
+    const obj = backup as Record<string, unknown>;
+    if (!Array.isArray(obj.characters)) {
+      throw new Error('無効なバックアップファイルです。characters アレイがありません。');
+    }
+    for (let i = 0; i < obj.characters.length; i++) {
+      const c = obj.characters[i] as Record<string, unknown> | null;
+      if (typeof c !== 'object' || c === null || typeof c.id !== 'string' || c.id.length === 0) {
+        throw new Error(`characters[${i}] が無効です（id が必要です）。`);
+      }
+      if (typeof c.name !== 'string' || typeof c.systemPrompt !== 'string') {
+        throw new Error(`characters[${i}] が無効です（name / systemPrompt が必要です）。`);
+      }
+    }
+    if (obj.messages !== undefined) {
+      if (!Array.isArray(obj.messages)) throw new Error('無効なバックアップファイルです。');
+      for (let i = 0; i < obj.messages.length; i++) {
+        const m = obj.messages[i] as Record<string, unknown> | null;
+        if (typeof m !== 'object' || m === null || typeof m.id !== 'string' || typeof m.characterId !== 'string') {
+          throw new Error(`messages[${i}] が無効です（id / characterId が必要です）。`);
+        }
+      }
+    }
+    if (obj.settings !== undefined && !Array.isArray(obj.settings)) {
+      throw new Error('無効なバックアップファイルです。');
+    }
+  }
 
   const handleImportFullBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -180,10 +209,13 @@ function SettingsFormModal({
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
-        const backup = JSON.parse(content);
-        if (!backup.characters || !Array.isArray(backup.characters)) {
-          throw new Error('無効なバックアップファイルです。');
-        }
+        const backup: unknown = JSON.parse(content);
+        validateBackupShape(backup);
+        const backupData = backup as {
+          characters: unknown[];
+          messages?: unknown[];
+          settings?: unknown[];
+        };
 
         if (confirm('既存のデータを上書きして復元しますか？')) {
           await db.transaction('rw', [db.characters, db.messages, db.settings], async () => {
@@ -191,12 +223,13 @@ function SettingsFormModal({
             await db.messages.clear();
             await db.settings.clear();
 
-            await db.characters.bulkAdd(backup.characters);
-            if (backup.messages && backup.messages.length > 0) {
-              await db.messages.bulkAdd(backup.messages);
+            // Shapes were validated above; cast to the Dexie table types.
+            await db.characters.bulkAdd(backupData.characters as Character[]);
+            if (backupData.messages && backupData.messages.length > 0) {
+              await db.messages.bulkAdd(backupData.messages as Message[]);
             }
-            if (backup.settings && backup.settings.length > 0) {
-              await db.settings.bulkAdd(backup.settings);
+            if (backupData.settings && backupData.settings.length > 0) {
+              await db.settings.bulkAdd(backupData.settings as UserSettings[]);
             }
           });
           alert('バックアップの復元が完了しました。ページを再読み込みします。');

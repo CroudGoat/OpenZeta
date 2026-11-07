@@ -11,6 +11,19 @@ interface AvatarImageProps {
   className?: string;
 }
 
+const AVATAR_DATA_URL_REGEX = /^data:image\/(png|jpe?g|webp|gif|svg\+xml|bmp|avif);/i;
+const AVATAR_HTTPS_REGEX = /^https:\/\//i;
+
+/**
+ * Only allow safe image sources for avatars (image data-URLs or https).
+ * Anything else (javascript:, data:text/html, http, file:, blob:...) falls
+ * back to the generated initials avatar.
+ */
+export function isValidAvatarSrc(src: string | undefined): src is string {
+  if (!src || typeof src !== 'string') return false;
+  return AVATAR_DATA_URL_REGEX.test(src) || AVATAR_HTTPS_REGEX.test(src);
+}
+
 export function AvatarImage({
   src,
   name,
@@ -47,7 +60,7 @@ export function AvatarImage({
 
   const initial = name ? name.trim().charAt(0).toUpperCase() : (isUser ? 'ME' : 'Z');
 
-  if (src && (src.startsWith('data:image') || src.startsWith('http') || src.startsWith('/'))) {
+  if (isValidAvatarSrc(src)) {
     return (
       <div
         className={`relative rounded-full overflow-hidden shrink-0 border border-zinc-800 shadow-sm bg-zinc-900 ${sizeClasses[size]} ${className}`}

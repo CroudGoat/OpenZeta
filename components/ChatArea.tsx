@@ -223,6 +223,86 @@ export function ChatArea({
     }
   }, []);
 
+  // ---------------------------------------------------------------
+  // Shared streaming helpers (used by send + regenerate)
+  // ---------------------------------------------------------------
+
+  type StreamOutcome =
+    | { status: 'ok' | 'aborted'; content: string; usage: TokenUsage }
+    | { status: 'error'; error: Error };
+
+  const estimateUsage = (prompt: string, completion: string): TokenUsage => {
+    const promptTokens = estimateTokens(prompt);
+    const completionTokens = estimateTokens(completion);
+    return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
+  };
+
+  /**
+   * Runs one streaming completion against the configured endpoint and
+   * normalises the outcome (ok / aborted / error) plus token usage.
+   * All streaming UI state (isStreaming, streamingContent, raf) is fully
+   * reset here in the finally block.
+   */
+  const runCompletionStream = useCallback(
+    async (history: Message[], promptText: string): Promise<StreamOutcome> => {
+      if (!character) return { status: 'error', error: new Error('No character selected') };
+
+      let accumulatedText = '';
+      let capturedUsage: TokenUsage | null = null;
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        const streamRes = await streamChatCompletion({
+          character,
+          history,
+          latestUserMessage: promptText,
+          settings,
+          signal: controller.signal,
+          onChunk: (chunk) => {
+            accumulatedText += chunk;
+            scheduleStreamingUpdate(accumulatedText);
+          },
+          onUsage: (usage) => {
+            capturedUsage = usage;
+          },
+        });
+
+        if (streamRes?.usage) {
+          capturedUsage = streamRes.usage;
+        }
+
+        return {
+          status: 'ok',
+          content: accumulatedText.trim() || '...',
+          usage: capturedUsage || estimateUsage(promptText, accumulatedText),
+        };
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error.name === 'AbortError') {
+          return {
+            status: 'aborted',
+            content: accumulatedText.trim(),
+            usage: capturedUsage || estimateUsage(promptText, accumulatedText),
+          };
+        }
+        return { status: 'error', error };
+      } finally {
+        if (rafIdRef.current !== null) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+        setIsStreaming(false);
+        setStreamingMessageId(null);
+        setStreamingContent('');
+        pendingStreamTextRef.current = '';
+        abortControllerRef.current = null;
+      }
+    },
+    [character, settings, scheduleStreamingUpdate]
+  );
+
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
     if (!text || isStreaming || !character) return;
@@ -231,22 +311,18 @@ export function ChatArea({
     setSmartReplies([]);
 
     // 1. Save user message to Dexie
-    const userMsgId = crypto.randomUUID();
-    const userTokens: TokenUsage = {
-      promptTokens: estimateTokens(text),
-      completionTokens: 0,
-      totalTokens: estimateTokens(text),
-    };
-
     const userMsg: Message = {
-      id: userMsgId,
+      id: crypto.randomUUID(),
       characterId: character.id,
       role: 'user',
       content: text,
       createdAt: Date.now(),
-      tokens: userTokens,
+      tokens: {
+        promptTokens: estimateTokens(text),
+        completionTokens: 0,
+        totalTokens: estimateTokens(text),
+      },
     };
-
     await addMessage(userMsg);
 
     // 2. Prepare streaming assistant message placeholder
@@ -268,108 +344,40 @@ export function ChatArea({
     setStreamingContent('');
     pendingStreamTextRef.current = '';
 
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    // 3. Stream the completion
+    const outcome = await runCompletionStream(updatedHistory, text);
 
-    let accumulatedText = '';
-    let capturedUsage: TokenUsage | null = null;
-
-    try {
-      const streamRes = await streamChatCompletion({
-        character,
-        history: updatedHistory,
-        latestUserMessage: text,
-        settings,
-        signal: controller.signal,
-        onChunk: (chunk) => {
-          accumulatedText += chunk;
-          scheduleStreamingUpdate(accumulatedText);
-        },
-        onUsage: (usage) => {
-          capturedUsage = usage;
-        },
-      });
-
-      if (streamRes?.usage) {
-        capturedUsage = streamRes.usage;
-      }
-
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-
-      const finalContent = accumulatedText.trim() || '...';
-      const usage: TokenUsage = capturedUsage || {
-        promptTokens: estimateTokens(text),
-        completionTokens: estimateTokens(accumulatedText),
-        totalTokens: estimateTokens(text) + estimateTokens(accumulatedText),
-      };
-
-      // 3. Save completed assistant message to Dexie
-      const finalAssistantMsg: Message = {
-        ...tempAssistantMsg,
-        content: finalContent,
-        variants: [finalContent],
+    if (outcome.status === 'error') {
+      console.error('Chat error:', outcome.error);
+      const errMsg: Message = {
+        id: assistantMsgId,
+        characterId: character.id,
+        role: 'assistant',
+        content: `⚠️ エラーが発生しました: ${outcome.error.message}\n\n「Settings」で Base URL や API Key を確認してください。`,
+        createdAt: Date.now(),
+        variants: [`⚠️ エラーが発生しました: ${outcome.error.message}`],
         variantIndex: 0,
-        tokens: usage,
-        variantTokens: [usage],
       };
-
-      await addMessage(finalAssistantMsg);
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantMsgId ? finalAssistantMsg : m))
-      );
-      onCharacterUpdated();
-    } catch (err: unknown) {
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      const error = err as Error;
-      if (error.name !== 'AbortError') {
-        console.error('Chat error:', error);
-        const errMsg: Message = {
-          id: assistantMsgId,
-          characterId: character.id,
-          role: 'assistant',
-          content: `⚠️ エラーが発生しました: ${error.message}\n\n「Settings」で Base URL や API Key を確認してください。`,
-          createdAt: Date.now(),
-          variants: [`⚠️ エラーが発生しました: ${error.message}`],
-          variantIndex: 0,
-        };
-        await addMessage(errMsg);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantMsgId ? errMsg : m))
-        );
-      } else if (accumulatedText.trim()) {
-        // Stream stopped by user
-        const finalContent = accumulatedText.trim();
-        const usage: TokenUsage = capturedUsage || {
-          promptTokens: estimateTokens(text),
-          completionTokens: estimateTokens(accumulatedText),
-          totalTokens: estimateTokens(text) + estimateTokens(accumulatedText),
-        };
-        const finalAssistantMsg: Message = {
-          ...tempAssistantMsg,
-          content: finalContent,
-          variants: [finalContent],
-          variantIndex: 0,
-          tokens: usage,
-          variantTokens: [usage],
-        };
-        await addMessage(finalAssistantMsg);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantMsgId ? finalAssistantMsg : m))
-        );
-      }
-    } finally {
-      setIsStreaming(false);
-      setStreamingMessageId(null);
-      setStreamingContent('');
-      pendingStreamTextRef.current = '';
-      abortControllerRef.current = null;
+      await addMessage(errMsg);
+      setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? errMsg : m)));
+      return;
     }
+
+    // Aborted with no content: leave the (empty) placeholder as is
+    if (outcome.status === 'aborted' && outcome.content === '') return;
+
+    // 4. Save completed assistant message to Dexie
+    const finalAssistantMsg: Message = {
+      ...tempAssistantMsg,
+      content: outcome.content,
+      variants: [outcome.content],
+      variantIndex: 0,
+      tokens: outcome.usage,
+      variantTokens: [outcome.usage],
+    };
+    await addMessage(finalAssistantMsg);
+    setMessages((prev) => prev.map((m) => (m.id === assistantMsgId ? finalAssistantMsg : m)));
+    onCharacterUpdated();
   };
 
   const handleStopStreaming = useCallback(() => {
@@ -410,7 +418,7 @@ export function ChatArea({
   const handleRegenerate = useCallback(async () => {
     if (isStreaming || messages.length === 0 || !character) return;
     const lastUserMsgIdx = [...messages].reverse().findIndex((m) => m.role === 'user');
-    
+
     let targetAssistantMsg: Message | undefined;
     let trimmedHistory: Message[] = [];
     let userPromptText = 'こんにちは！';
@@ -440,15 +448,15 @@ export function ChatArea({
       targetAssistantMsg.variants && targetAssistantMsg.variants.length > 0
         ? [...targetAssistantMsg.variants]
         : targetAssistantMsg.content
-        ? [targetAssistantMsg.content]
-        : [];
+          ? [targetAssistantMsg.content]
+          : [];
 
     const currentVariantTokens =
       targetAssistantMsg.variantTokens && targetAssistantMsg.variantTokens.length > 0
         ? [...targetAssistantMsg.variantTokens]
         : targetAssistantMsg.tokens
-        ? [targetAssistantMsg.tokens]
-        : [];
+          ? [targetAssistantMsg.tokens]
+          : [];
 
     const inFlightVariantIndex = currentVariants.length;
 
@@ -472,110 +480,38 @@ export function ChatArea({
     setStreamingContent('');
     pendingStreamTextRef.current = '';
 
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    const outcome = await runCompletionStream(trimmedHistory, userPromptText);
 
-    let accumulatedText = '';
-    let capturedUsage: TokenUsage | null = null;
+    if (outcome.status === 'error') {
+      console.error('Chat regenerate error:', outcome.error);
+      return;
+    }
+    if (outcome.status === 'aborted' && outcome.content === '') return;
 
-    try {
-      const streamRes = await streamChatCompletion({
-        character,
-        history: trimmedHistory,
-        latestUserMessage: userPromptText,
-        settings,
-        signal: controller.signal,
-        onChunk: (chunk) => {
-          accumulatedText += chunk;
-          scheduleStreamingUpdate(accumulatedText);
-        },
-        onUsage: (usage) => {
-          capturedUsage = usage;
-        },
-      });
+    const newVariants = [...currentVariants, outcome.content];
+    const newVariantIndex = newVariants.length - 1;
+    const newVariantTokens = [...currentVariantTokens, outcome.usage];
 
-      if (streamRes?.usage) {
-        capturedUsage = streamRes.usage;
-      }
+    const assistantMsg: Message = {
+      ...targetAssistantMsg,
+      content: outcome.content,
+      variants: newVariants,
+      variantIndex: newVariantIndex,
+      tokens: outcome.usage,
+      variantTokens: newVariantTokens,
+    };
 
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-
-      const newContent = accumulatedText.trim() || '...';
-      const newVariants = [...currentVariants, newContent];
-      const newVariantIndex = newVariants.length - 1;
-
-      const newUsage: TokenUsage = capturedUsage || {
-        promptTokens: estimateTokens(userPromptText),
-        completionTokens: estimateTokens(accumulatedText),
-        totalTokens: estimateTokens(userPromptText) + estimateTokens(accumulatedText),
-      };
-
-      const newVariantTokens = [...currentVariantTokens, newUsage];
-
-      const assistantMsg: Message = {
-        ...targetAssistantMsg,
-        content: newContent,
-        variants: newVariants,
-        variantIndex: newVariantIndex,
-        tokens: newUsage,
-        variantTokens: newVariantTokens,
-      };
-
-      await addMessage(assistantMsg);
-
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantMsg.id ? assistantMsg : m))
-      );
-
+    await addMessage(assistantMsg);
+    setMessages((prev) => prev.map((m) => (m.id === assistantMsg.id ? assistantMsg : m)));
+    if (outcome.status === 'ok') {
       onCharacterUpdated();
-    } catch (err: unknown) {
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      const error = err as Error;
-      if (error.name !== 'AbortError') {
-        console.error('Chat regenerate error:', error);
-      } else if (accumulatedText.trim()) {
-        const newContent = accumulatedText.trim();
-        const newVariants = [...currentVariants, newContent];
-        const newVariantIndex = newVariants.length - 1;
-        const newUsage: TokenUsage = capturedUsage || {
-          promptTokens: estimateTokens(userPromptText),
-          completionTokens: estimateTokens(accumulatedText),
-          totalTokens: estimateTokens(userPromptText) + estimateTokens(accumulatedText),
-        };
-        const newVariantTokens = [...currentVariantTokens, newUsage];
-        const assistantMsg: Message = {
-          ...targetAssistantMsg,
-          content: newContent,
-          variants: newVariants,
-          variantIndex: newVariantIndex,
-          tokens: newUsage,
-          variantTokens: newVariantTokens,
-        };
-        await addMessage(assistantMsg);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantMsg.id ? assistantMsg : m))
-        );
-      }
-    } finally {
-      setIsStreaming(false);
-      setStreamingMessageId(null);
-      setStreamingContent('');
-      pendingStreamTextRef.current = '';
-      abortControllerRef.current = null;
     }
   }, [
     isStreaming,
     messages,
     character,
-    settings,
-    scheduleStreamingUpdate,
     onCharacterUpdated,
+    runCompletionStream,
   ]);
 
   // Generate Smart Replies

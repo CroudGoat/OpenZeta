@@ -1,4 +1,5 @@
 import { Character, Message, UserSettings, TokenUsage } from './db';
+import { downloadJsonFile } from './utils';
 
 export interface ChatCompletionOptions {
   character: Character;
@@ -302,14 +303,6 @@ export function exportCharacterToFile(character: Character) {
     },
   };
 
-  const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-    JSON.stringify(exportData, null, 2)
-  )}`;
-  const downloadAnchor = document.createElement('a');
   const safeName = character.name.replace(/[^a-zA-Z0-9_\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, '_');
-  downloadAnchor.setAttribute('href', jsonString);
-  downloadAnchor.setAttribute('download', `openzeta-character-${safeName || 'char'}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
+  downloadJsonFile(`openzeta-character-${safeName || 'char'}.json`, exportData);
 }
