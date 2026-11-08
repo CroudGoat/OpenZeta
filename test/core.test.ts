@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isBlockedIp } from '../lib/safe-url.ts';
-import { parseMessageSegments } from '../lib/message-parser.ts';
+import { parseMessageSegments, hasNarration } from '../lib/message-parser.ts';
 
 // The IP table decides whether the server may fetch an endpoint. A single
 // wrong range here is an SSRF hole, so the ranges are pinned by tests.
@@ -35,6 +35,14 @@ test('parseMessageSegments splits narration and dialogue', () => {
   assert.equal(segments[1].type, 'dialogue');
   assert.equal(segments[1].speakerName, 'ルナ');
   assert.equal(segments[1].isUser, false);
+});
+
+test('hasNarration finds narrator tags only when the tag is real', () => {
+  assert.equal(hasNarration('@ナレーター: 朝の光が差し込む。'), true);
+  assert.equal(hasNarration('@ルナ: おはよう\n@ナレーション: 風が吹く'), true);
+  assert.equal(hasNarration('@ルナ: おはよう！'), false);
+  assert.equal(hasNarration('ナレーター: タグの無い行'), false);
+  assert.equal(hasNarration(''), false);
 });
 
 test('parseMessageSegments strips thoughts and falls back without tags', () => {

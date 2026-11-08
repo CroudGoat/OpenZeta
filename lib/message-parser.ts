@@ -44,6 +44,19 @@ const TAG_LINE_REGEX = /^@([^\n:：]+)[:：](.*)$/;
 const PARTIAL_TAG_REGEX = /^@([^\n:：]+)$/;
 
 /**
+ * True when the text contains at least one narration segment (@ナレーター: etc).
+ */
+export function hasNarration(content: string): boolean {
+  if (!content || content.indexOf('@') === -1) return false;
+  for (const line of content.split('\n')) {
+    if (line.charCodeAt(0) !== 64 /* '@' */) continue;
+    const match = line.match(TAG_LINE_REGEX);
+    if (match && isNarrationSpeaker(match[1])) return true;
+  }
+  return false;
+}
+
+/**
  * Formats dialogue content so that action asterisks (*action*) are placed on their own lines cleanly.
  */
 function formatDialogueAsterisks(text: string): string {

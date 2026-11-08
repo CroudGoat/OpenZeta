@@ -1,4 +1,5 @@
 import { Character, Message, UserSettings, TokenUsage } from './db';
+import { hasNarration } from './message-parser';
 import { downloadJsonFile } from './utils';
 
 interface ChatCompletionOptions {
@@ -80,10 +81,23 @@ function buildPromptMessages(
 - @ナレーター: シーン全体の情景描写、環境音、第三者視点の地の文
   例: @ナレーター: 窓から柔らかな朝の光が差し込み、静かな部屋を温かく照らしている。`;
 
+  // If the last two replies had no narration, make this turn produce one so the
+  // scene description does not disappear for long stretches.
+  const recentReplies = history.filter((msg) => msg.role === 'assistant').slice(-2);
+  const needsNarration =
+    recentReplies.length === 2 && !recentReplies.some((msg) => hasNarration(msg.content));
+
+  const forcedNarrationInstruction = `
+
+【今回の必須事項】
+直近の応答で情景描写（@ナレーター）が使われていません。今回は返答の冒頭に必ず
+「@ナレーター: 」で始まる情景・状況描写を1〜2文入れてから、キャラクターのセリフを続けてください。`;
+
   const fullSystemPrompt =
     (character.systemPrompt || `あなたは「${character.name}」です。`) +
     userInfoPrompt +
-    formatInstruction;
+    formatInstruction +
+    (needsNarration ? forcedNarrationInstruction : '');
 
   result.push({
     role: 'system',
