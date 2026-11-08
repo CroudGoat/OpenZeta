@@ -9,11 +9,14 @@ import {
   getCharacters,
   getSettings,
 } from '@/lib/db';
+import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatArea } from '@/components/ChatArea';
-import { CharacterModal } from '@/components/CharacterModal';
-import { SettingsModal } from '@/components/SettingsModal';
-import { ImportCharacterModal } from '@/components/ImportCharacterModal';
+
+// Modals are opened on demand, so keep them out of the initial bundle.
+const CharacterModal = dynamic(() => import('@/components/CharacterModal').then((m) => m.CharacterModal), { ssr: false });
+const SettingsModal = dynamic(() => import('@/components/SettingsModal').then((m) => m.SettingsModal), { ssr: false });
+const ImportCharacterModal = dynamic(() => import('@/components/ImportCharacterModal').then((m) => m.ImportCharacterModal), { ssr: false });
 
 export default function Home() {
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -91,6 +94,15 @@ export default function Home() {
     setIsMobileSidebarOpen(false);
   };
 
+  const sidebarProps = {
+    characters,
+    selectedCharacterId,
+    onSelectCharacter: handleSelectCharacter,
+    onOpenNewCharacterModal: handleOpenNewCharacter,
+    onOpenEditCharacterModal: handleOpenEditCharacter,
+    onCharactersChanged: () => refreshData(),
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background text-foreground">
@@ -110,14 +122,9 @@ export default function Home() {
     <main className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       {/* Desktop Sidebar */}
       <Sidebar
-        characters={characters}
-        selectedCharacterId={selectedCharacterId}
-        onSelectCharacter={handleSelectCharacter}
-        onOpenNewCharacterModal={handleOpenNewCharacter}
-        onOpenEditCharacterModal={handleOpenEditCharacter}
+        {...sidebarProps}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onOpenImportModal={() => setIsImportModalOpen(true)}
-        onCharactersChanged={() => refreshData()}
         className="hidden md:flex"
       />
 
@@ -130,11 +137,7 @@ export default function Home() {
           />
           <div className="relative w-80 max-w-[85vw] h-full z-10 animate-in slide-in-from-left duration-200">
             <Sidebar
-              characters={characters}
-              selectedCharacterId={selectedCharacterId}
-              onSelectCharacter={handleSelectCharacter}
-              onOpenNewCharacterModal={handleOpenNewCharacter}
-              onOpenEditCharacterModal={handleOpenEditCharacter}
+              {...sidebarProps}
               onOpenSettingsModal={() => {
                 setIsMobileSidebarOpen(false);
                 setIsSettingsModalOpen(true);
@@ -143,7 +146,6 @@ export default function Home() {
                 setIsMobileSidebarOpen(false);
                 setIsImportModalOpen(true);
               }}
-              onCharactersChanged={() => refreshData()}
               className="w-full h-full shadow-2xl"
             />
           </div>
@@ -160,26 +162,32 @@ export default function Home() {
         onCharacterUpdated={() => refreshData()}
       />
 
-      {/* Modals */}
-      <CharacterModal
-        isOpen={isCharacterModalOpen}
-        onClose={() => setIsCharacterModalOpen(false)}
-        characterToEdit={characterToEdit}
-        onSaved={handleCharacterSaved}
-      />
+      {/* Modals (lazy chunks, mounted only while open) */}
+      {isCharacterModalOpen && (
+        <CharacterModal
+          isOpen
+          onClose={() => setIsCharacterModalOpen(false)}
+          characterToEdit={characterToEdit}
+          onSaved={handleCharacterSaved}
+        />
+      )}
 
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        settings={settings}
-        onSettingsSaved={(newSettings) => setSettings(newSettings)}
-      />
+      {isSettingsModalOpen && (
+        <SettingsModal
+          isOpen
+          onClose={() => setIsSettingsModalOpen(false)}
+          settings={settings}
+          onSettingsSaved={(newSettings) => setSettings(newSettings)}
+        />
+      )}
 
-      <ImportCharacterModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onCharacterImported={handleCharacterImported}
-      />
+      {isImportModalOpen && (
+        <ImportCharacterModal
+          isOpen
+          onClose={() => setIsImportModalOpen(false)}
+          onCharacterImported={handleCharacterImported}
+        />
+      )}
     </main>
   );
 }

@@ -35,7 +35,7 @@ interface ChatHeaderProps {
   onClearHistory: () => void;
 }
 
-export function ChatHeader({
+export const ChatHeader = React.memo(function ChatHeader({
   character,
   settings,
   conversationStats,
@@ -182,4 +182,4 @@ export function ChatHeader({
       </div>
     </header>
   );
-}
+});

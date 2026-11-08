@@ -156,7 +156,7 @@ export function isBlockedIp(ip: string): boolean {
 
 /* --------------------------- URL validation --------------------------- */
 
-export type UrlCheckResult =
+type UrlCheckResult =
   | { ok: true; url: string }
   | { ok: false; error: string };
 

@@ -46,7 +46,7 @@ const PARTIAL_TAG_REGEX = /^@([^\n:：]+)$/;
 /**
  * Formats dialogue content so that action asterisks (*action*) are placed on their own lines cleanly.
  */
-export function formatDialogueAsterisks(text: string): string {
+function formatDialogueAsterisks(text: string): string {
   if (!text || text.indexOf('*') === -1) return text;
 
   const formatted = text.replace(ASTERISK_REGEX, (_match, inner) => `\n*${inner.trim()}*\n`);

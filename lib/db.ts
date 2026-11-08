@@ -39,7 +39,7 @@ export interface UserSettings {
   maxHistoryCount?: number;
 }
 
-export class OpenZetaDB extends Dexie {
+class OpenZetaDB extends Dexie {
   characters!: Table<Character, string>;
   messages!: Table<Message, string>;
   settings!: Table<UserSettings, string>;

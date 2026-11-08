@@ -1,7 +1,7 @@
 import { Character, Message, UserSettings, TokenUsage } from './db';
 import { downloadJsonFile } from './utils';
 
-export interface ChatCompletionOptions {
+interface ChatCompletionOptions {
   character: Character;
   history: Message[];
   latestUserMessage: string;
@@ -11,7 +11,7 @@ export interface ChatCompletionOptions {
   signal?: AbortSignal;
 }
 
-export interface StreamCompletionResult {
+interface StreamCompletionResult {
   fullText: string;
   usage: TokenUsage;
 }
@@ -45,7 +45,7 @@ export function estimateTokens(text: string): number {
  * 2. Recent history (up to maxHistoryCount)
  * 3. Latest user message
  */
-export function buildPromptMessages(
+function buildPromptMessages(
   character: Character,
   history: Message[],
   latestUserMessage: string,

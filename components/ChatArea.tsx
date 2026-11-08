@@ -43,7 +43,6 @@ export function ChatArea({
   onCharacterUpdated,
 }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputText, setInputText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState('');
@@ -56,7 +55,6 @@ export function ChatArea({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const pendingStreamTextRef = useRef<string>('');
@@ -180,17 +178,6 @@ export function ChatArea({
     setIsAtBottom(distanceFromBottom < 100);
   }, []);
 
-  // Adjust textarea height
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        180
-      )}px`;
-    }
-  }, [inputText]);
-
   // Actions
   const handleCopyMessage = useCallback((id: string, text: string) => {
     navigator.clipboard
@@ -310,11 +297,10 @@ export function ChatArea({
     [character, settings, scheduleStreamingUpdate]
   );
 
-  const handleSendMessage = async (textToSend?: string) => {
-    const text = (textToSend || inputText).trim();
+  const handleSendMessage = async (rawText: string) => {
+    const text = rawText.trim();
     if (!text || isStreaming || !character) return;
 
-    setInputText('');
     setSmartReplies([]);
 
     // 1. Save user message to Dexie
@@ -647,13 +633,10 @@ export function ChatArea({
 
       {/* Input Area */}
       <ChatInputArea
-        inputText={inputText}
-        setInputText={setInputText}
         isStreaming={isStreaming}
         characterName={character.name}
         smartReplies={smartReplies}
         isLoadingSmartReplies={isLoadingSmartReplies}
-        textareaRef={textareaRef}
         onSendMessage={handleSendMessage}
         onStopStreaming={handleStopStreaming}
         onGenerateSmartReplies={handleGenerateSmartReplies}

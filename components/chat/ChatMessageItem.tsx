@@ -304,46 +304,18 @@ export const ChatMessageItem = React.memo(
     </div>
   );
 },
-(prevProps, nextProps) => {
-  // If streaming status or streaming text changed on this message, re-render
-  if (
-    prevProps.isStreamingActive !== nextProps.isStreamingActive ||
-    prevProps.streamingContent !== nextProps.streamingContent
-  ) {
-    return false;
-  }
-
-  // If this message was copied/uncopied, re-render
-  const wasCopied = prevProps.copiedMsgId === prevProps.message.id;
-  const isCopied = nextProps.copiedMsgId === nextProps.message.id;
-  if (wasCopied !== isCopied) {
-    return false;
-  }
-
-  // If isLatestAssistant changed, re-render (e.g. to show/hide retry button)
-  if (prevProps.isLatestAssistant !== nextProps.isLatestAssistant) {
-    return false;
-  }
-
-  // If character avatar or name changed
-  if (
-    prevProps.character.id !== nextProps.character.id ||
-    prevProps.character.name !== nextProps.character.name ||
-    prevProps.character.avatarBase64 !== nextProps.character.avatarBase64
-  ) {
-    return false;
-  }
-
-  // If message itself changed (e.g. variantIndex, content, variants)
-  if (
-    prevProps.message.id !== nextProps.message.id ||
-    prevProps.message.content !== nextProps.message.content ||
-    prevProps.message.variantIndex !== nextProps.message.variantIndex ||
-    prevProps.message.variants?.length !== nextProps.message.variants?.length ||
-    prevProps.message.tokens !== nextProps.message.tokens
-  ) {
-    return false;
-  }
-
-  return true;
-});
+(a, b) =>
+  // Re-render only when something this row actually shows has changed.
+  a.isStreamingActive === b.isStreamingActive &&
+  a.streamingContent === b.streamingContent &&
+  a.isLatestAssistant === b.isLatestAssistant &&
+  (a.copiedMsgId === a.message.id) === (b.copiedMsgId === b.message.id) &&
+  a.character.id === b.character.id &&
+  a.character.name === b.character.name &&
+  a.character.avatarBase64 === b.character.avatarBase64 &&
+  a.message.id === b.message.id &&
+  a.message.content === b.message.content &&
+  a.message.variantIndex === b.message.variantIndex &&
+  a.message.variants?.length === b.message.variants?.length &&
+  a.message.tokens === b.message.tokens
+);

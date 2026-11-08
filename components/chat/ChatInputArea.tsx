@@ -1,40 +1,52 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Send, Square, Sparkles, RefreshCw, Coins } from 'lucide-react';
 import { estimateTokens } from '@/lib/llm-client';
 
 interface ChatInputAreaProps {
-  inputText: string;
-  setInputText: (val: string) => void;
   isStreaming: boolean;
   characterName: string;
   smartReplies: string[];
   isLoadingSmartReplies: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  onSendMessage: (text?: string) => void;
+  onSendMessage: (text: string) => void;
   onStopStreaming: () => void;
   onGenerateSmartReplies: () => void;
 }
 
-export function ChatInputArea({
-  inputText,
-  setInputText,
+/**
+ * Owns the draft text so typing does not re-render the whole message list.
+ */
+export const ChatInputArea = React.memo(function ChatInputArea({
   isStreaming,
   characterName,
   smartReplies,
   isLoadingSmartReplies,
-  textareaRef,
   onSendMessage,
   onStopStreaming,
   onGenerateSmartReplies,
 }: ChatInputAreaProps) {
+  const [inputText, setInputText] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }, [inputText]);
+
+  const submit = () => {
+    const text = inputText.trim();
+    if (!text || isStreaming) return;
+    setInputText('');
+    onSendMessage(text);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (inputText.trim() && !isStreaming) {
-        onSendMessage();
-      }
+      submit();
     }
   };
 
@@ -109,7 +121,7 @@ export function ChatInputArea({
             <button
               type="button"
               id="send-message-btn"
-              onClick={() => onSendMessage()}
+              onClick={submit}
               disabled={!inputText.trim()}
               className="absolute right-2.5 bottom-2.5 sm:right-3 sm:bottom-3 p-2 sm:p-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-900/40 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
               title="Send (Enter)"
@@ -134,4 +146,4 @@ export function ChatInputArea({
       </div>
     </div>
   );
-}
+});
