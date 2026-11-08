@@ -5,14 +5,18 @@
 #   3. http://localhost:3000 を開く
 #
 # .env が無くても起動できます (アプリ内 Settings で BYOK を設定)。
+# 3000 番が埋まっている場合は HOST_PORT を変えてください:
+#   HOST_PORT=3001 docker compose up -d
 
 services:
   openzeta:
     build: .
     image: openzeta:latest
+    # ローカル専用イメージなのでレジストリから pull しない
+    pull_policy: build
     container_name: openzeta
     ports:
-      - "3000:3000"
+      - "${HOST_PORT:-3000}:3000"
     environment:
       # サーバー側の Gemini キー (任意)
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}

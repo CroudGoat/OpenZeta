@@ -104,7 +104,7 @@ Gemini のキーは https://aistudio.google.com/apikey で取得できます。
 |---|---|
 | 起動後 `Gemini API Key is not configured` と出る | キー未設定です。上記「API キーの設定」A または B を行ってください |
 | `Error: Cannot find module ...` | `npm ci` をやり直してください（`node_modules` を削除してから実行） |
-| Docker で起動しない | `docker compose logs -f` でログを確認。ポート 3000 が使用中の場合は `-p 3001:3000` に変更 |
+| `Bind for 0.0.0.0:3000 failed: port is already allocated` | 3000 番が他のアプリ/コンテナに使われています。`HOST_PORT=3001 docker compose up -d` で別ポートを使うか、占有しているものを止めてください |
 | 会話履歴が消えた | データは**ブラウザごと**の IndexedDB に保存されます。別ブラウザ・シークレットモードでは見えません。Settings → データ管理 からバックアップできます |
 | 外部エンドポイントに繋がらない | サーバー側の SSRF 対策により、プライベート IP・localhost・クラウドメタデータ宛は意図的にブロックされます（[SECURITY.md](SECURITY.md)） |
 | Node のバージョンエラー | Node.js 22 を使用してください（`.nvmrc` あり。`nvm use` で切り替え可能） |
