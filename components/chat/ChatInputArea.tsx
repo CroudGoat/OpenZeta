@@ -52,7 +52,7 @@ export const ChatInputArea = React.memo(function ChatInputArea({
 
   return (
     <div className="p-3 sm:p-5 bg-[#0c0c0e] border-t border-zinc-800 z-10 shrink-0">
-      <div className="max-w-4xl mx-auto space-y-2.5 sm:space-y-3">
+      <div className="max-w-3xl mx-auto space-y-2.5 sm:space-y-3">
         {/* Suggestions Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none max-w-full">
           <button

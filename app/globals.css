@@ -53,7 +53,7 @@
 /* Keep the conversation in a readable centred column (same width as the input
    bar), and skip layout/paint for messages scrolled out of view. */
 #chat-messages-container > * {
-  max-width: 56rem;
+  max-width: 48rem;
   margin-inline: auto;
   content-visibility: auto;
   contain-intrinsic-size: auto 200px;
