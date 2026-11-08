@@ -64,6 +64,12 @@ function buildPromptMessages(
     userInfoPrompt += `\n- ユーザーに関する背景設定・要望: ${userSettings.userBio.trim()}`;
   }
 
+  // A single concrete number is easier to follow than a range, and rolling it
+  // per reply keeps the rhythm from becoming uniform. Still an instruction, not
+  // a guarantee: the model can miscount.
+  const dialogueBlocks = 2 + Math.floor(Math.random() * 3); // 2..4
+  const narrationBlocks = 1 + Math.floor(Math.random() * 3); // 1..3
+
   // 1. System Prompt with Multi-Role Dialogue and Action instructions (excluding inner thoughts in asterisks)
   const formatInstruction = `
 
@@ -81,13 +87,12 @@ function buildPromptMessages(
 - @ナレーター: シーン全体の情景描写、環境音、第三者視点の地の文
   例: @ナレーター: 窓から柔らかな朝の光が差し込み、静かな部屋を温かく照らしている。
 
-【1回の返答の文量（厳守）】
-1回の返答には、次のブロックをこの回数範囲で含めてください。
-- @${character.name}: （キャラクターのセリフと行動）… 2回〜4回
-- @ナレーター: （情景・状況の描写）… 1回〜3回
-各ブロックは1〜3文程度にまとめ、同じ話者のブロックが続けて並ばないように
-ナレーションを挟んでテンポよく構成してください。
-セリフだけで終わらせず、必ず情景描写を1回以上含めてください。`;
+【今回の構成（厳守）】
+今回は次の回数ちょうどで出力してください。
+- @${character.name}: ${dialogueBlocks}回
+- @ナレーター: ${narrationBlocks}回
+各ブロックは1〜3文程度。同じ話者のブロックを連続させず、
+ナレーションを挟んでテンポよく構成してください。`;
 
   // If the last two replies had no narration, make this turn produce one so the
   // scene description does not disappear for long stretches.
