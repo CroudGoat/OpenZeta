@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.gitignore
+npm-debug.log*
+.npm-cache
+
+# 環境変数はイメージに焼き込まない (実行時に -e で渡す)
+.env*
+
+# 開発用ファイル
+tsconfig.tsbuildinfo
+*.log
+Dockerfile
+docker-compose.yml
+.dockerignore

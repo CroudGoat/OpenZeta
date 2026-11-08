@@ -1,7 +1,12 @@
 {
-  "name": "ai-studio-applet",
+  "name": "openzeta",
   "version": "0.1.0",
+  "description": "Local-first AI character dialogue app with BYOK endpoints, plot control and smart replies.",
   "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

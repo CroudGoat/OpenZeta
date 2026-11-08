@@ -1,0 +1,19 @@
+# OpenZeta — docker compose 用設定
+#
+#   1. このディレクトリに .env を作る (任意): GEMINI_API_KEY=xxxxx
+#   2. docker compose up -d
+#   3. http://localhost:3000 を開く
+#
+# .env が無くても起動できます (アプリ内 Settings で BYOK を設定)。
+
+services:
+  openzeta:
+    build: .
+    image: openzeta:latest
+    container_name: openzeta
+    ports:
+      - "3000:3000"
+    environment:
+      # サーバー側の Gemini キー (任意)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    restart: unless-stopped
