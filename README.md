@@ -31,12 +31,14 @@ docker compose down
 ```
 
 > **イメージを自分でビルドしたくない場合**
-> GitHub Actions が `ghcr.io/croudgoat/openzeta:latest` を自動ビルド・公開します
-> （`.github/workflows/docker-publish.yml`）。公開後は以下だけで動きます。
+> GitHub Actions が `ghcr.io/croudgoat/openzeta` を自動ビルド・公開しています
+> （`.github/workflows/docker-publish.yml`）。ビルド不要で、次の 1 行で動きます。
 >
 > ```bash
 > docker run -d -p 3000:3000 --name openzeta ghcr.io/croudgoat/openzeta:latest
 > ```
+>
+> 本番では `:latest` ではなく `:0.1.0` のようなバージョン固定タグを使ってください。
 
 ### 方法 2: ローカルで直接動かす（Node.js が必要）
 
