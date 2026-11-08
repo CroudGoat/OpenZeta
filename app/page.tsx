@@ -8,6 +8,7 @@ import {
   initializeDatabase,
   getCharacters,
   getSettings,
+  saveSettings,
 } from '@/lib/db';
 import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/Sidebar';
@@ -94,6 +95,13 @@ export default function Home() {
     setIsMobileSidebarOpen(false);
   };
 
+  const handleSelectProfile = async (id: string) => {
+    if (id === settings.activeProfileId) return;
+    const updated: UserSettings = { ...settings, activeProfileId: id };
+    setSettings(updated);
+    await saveSettings(updated);
+  };
+
   const sidebarProps = {
     characters,
     selectedCharacterId,
@@ -160,6 +168,7 @@ export default function Home() {
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(true)}
         onCharacterUpdated={() => refreshData()}
+        onSelectProfile={handleSelectProfile}
       />
 
       {/* Modals (lazy chunks, mounted only while open) */}

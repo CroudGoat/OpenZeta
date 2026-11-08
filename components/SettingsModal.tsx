@@ -21,7 +21,7 @@ import {
   Users,
   Info,
 } from 'lucide-react';
-import { Character, Message, UserSettings, saveSettings, db, DEFAULT_SETTINGS } from '@/lib/db';
+import { Character, Message, TalkProfile, UserSettings, activeProfile, saveSettings, db, DEFAULT_SETTINGS } from '@/lib/db';
 import { useModalDismiss } from '@/hooks/use-modal-dismiss';
 import { downloadJsonFile } from '@/lib/utils';
 
@@ -52,8 +52,31 @@ function SettingsFormModal({
   const [showApiKey, setShowApiKey] = useState(false);
 
   // User Settings State
-  const [userName, setUserName] = useState(settings.userName || 'ユーザー');
-  const [userBio, setUserBio] = useState(settings.userBio || '');
+  // Talk profiles: the whole library is edited here, the active one is what gets used.
+  const [profiles, setProfiles] = useState<TalkProfile[]>(settings.profiles);
+  const [activeId, setActiveId] = useState(settings.activeProfileId);
+  const profile = activeProfile({ ...settings, profiles, activeProfileId: activeId });
+
+  const updateActiveProfile = (patch: Partial<TalkProfile>) =>
+    setProfiles((prev) => prev.map((p) => (p.id === profile.id ? { ...p, ...patch } : p)));
+
+  const addProfile = () => {
+    const created: TalkProfile = {
+      id: crypto.randomUUID(),
+      name: `プロフィール ${profiles.length + 1}`,
+      userName: profile.userName,
+      userBio: '',
+    };
+    setProfiles((prev) => [...prev, created]);
+    setActiveId(created.id);
+  };
+
+  const removeProfile = () => {
+    if (profiles.length <= 1) return;
+    const remaining = profiles.filter((p) => p.id !== profile.id);
+    setProfiles(remaining);
+    setActiveId(remaining[0].id);
+  };
 
   useModalDismiss(true, onClose);
 
@@ -126,10 +149,19 @@ function SettingsFormModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const normalizedProfiles = profiles.map((p) => ({
+        ...p,
+        name: p.name.trim() || 'プロフィール',
+        userName: p.userName.trim() || 'ユーザー',
+        userBio: p.userBio.trim(),
+      }));
+
       const newSettings: UserSettings = {
         id: 'default',
-        userName: userName.trim() || 'ユーザー',
-        userBio: userBio.trim(),
+        profiles: normalizedProfiles,
+        activeProfileId: normalizedProfiles.some((p) => p.id === activeId)
+          ? activeId
+          : normalizedProfiles[0].id,
         baseUrl: baseUrl.trim() || '/api/chat',
         apiKey: apiKey.trim(),
         modelName: modelName.trim() || 'gemini-2.5-flash',
@@ -507,6 +539,64 @@ function SettingsFormModal({
                 </p>
               </div>
 
+              {/* Talk profile switcher */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-zinc-200 flex items-center justify-between">
+                  <span>トークプロフィール</span>
+                  <span className="text-xs text-zinc-500 font-normal">{profiles.length} 件</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    id="settings-profile-select"
+                    value={profile.id}
+                    onChange={(e) => setActiveId(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 text-sm cursor-pointer focus:outline-none focus:border-indigo-500/50"
+                  >
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name || '(無題)'}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    id="add-profile-btn"
+                    onClick={addProfile}
+                    className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-medium hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                  >
+                    追加
+                  </button>
+                  <button
+                    type="button"
+                    id="remove-profile-btn"
+                    onClick={removeProfile}
+                    disabled={profiles.length <= 1}
+                    className="px-3 py-2 rounded-xl bg-rose-950/30 border border-rose-500/30 text-rose-400 text-xs font-medium hover:bg-rose-950/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                  >
+                    削除
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-500">
+                  プロフィールは会話履歴とは別に保存されます。チャット画面のヘッダーから、いつでも切り替えられます。
+                </p>
+              </div>
+
+              {/* Profile label */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-zinc-500" />
+                  プロフィール名（一覧に表示される名前）
+                </label>
+                <input
+                  id="settings-profile-name-input"
+                  type="text"
+                  value={profile.name}
+                  onChange={(e) => updateActiveProfile({ name: e.target.value })}
+                  placeholder="例: マスター, 仕事用, 休日モード"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 text-sm transition-all"
+                />
+              </div>
+
               {/* User Display Name */}
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-zinc-200 flex items-center gap-1.5">
@@ -516,8 +606,8 @@ function SettingsFormModal({
                 <input
                   id="settings-username-input"
                   type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
+                  value={profile.userName}
+                  onChange={(e) => updateActiveProfile({ userName: e.target.value })}
                   placeholder="例: マスター, ユーザー, タカシ"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 text-sm transition-all"
                 />
@@ -529,14 +619,14 @@ function SettingsFormModal({
               {/* User Bio / Personal Preferences */}
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-zinc-200 flex items-center justify-between">
-                  <span>ユーザー背景・好み・プロファイル（任意）</span>
+                  <span>ユーザー背景・好み（任意）</span>
                   <span className="text-xs text-zinc-500 font-normal">System Promptに注入</span>
                 </label>
                 <textarea
                   id="settings-userbio-textarea"
                   rows={4}
-                  value={userBio}
-                  onChange={(e) => setUserBio(e.target.value)}
+                  value={profile.userBio}
+                  onChange={(e) => updateActiveProfile({ userBio: e.target.value })}
                   placeholder="例:&#10;- 日常会話は敬語ではなく、フランクで親しみやすい口調が好きです。&#10;- サイバーパンク、SF小説、プログラミングに興味があります。&#10;- アドバイスは具体的かつ論理的に説明してください。"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 text-sm leading-relaxed transition-all resize-y"
                 />
@@ -553,10 +643,10 @@ function SettingsFormModal({
                 </div>
                 <div className="p-2.5 bg-zinc-950 rounded-lg font-mono text-[11px] text-zinc-400 leading-relaxed border border-zinc-800/60">
                   <div>【対話相手（ユーザー）の情報】</div>
-                  <div>- ユーザーの呼び名/名前: {userName.trim() || 'ユーザー'}</div>
-                  {userBio.trim() && (
+                  <div>- ユーザーの呼び名/名前: {profile.userName.trim() || 'ユーザー'}</div>
+                  {profile.userBio.trim() && (
                     <div className="mt-1 whitespace-pre-wrap text-zinc-300">
-                      - ユーザーに関する背景設定・要望: {userBio.trim()}
+                      - ユーザーに関する背景設定・要望: {profile.userBio.trim()}
                     </div>
                   )}
                 </div>
@@ -678,7 +768,7 @@ export function SettingsModal({
 
   return (
     <SettingsFormModal
-      key={`${settings.baseUrl}-${settings.modelName}-${settings.temperature}-${settings.userName}`}
+      key={`${settings.baseUrl}-${settings.modelName}-${settings.temperature}-${settings.activeProfileId}`}
       onClose={onClose}
       settings={settings}
       onSettingsSaved={onSettingsSaved}

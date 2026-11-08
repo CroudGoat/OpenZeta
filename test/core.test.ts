@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isBlockedIp } from '../lib/safe-url.ts';
 import { parseMessageSegments, hasNarration } from '../lib/message-parser.ts';
+import { activeProfile, DEFAULT_SETTINGS } from '../lib/db.ts';
 
 // The IP table decides whether the server may fetch an endpoint. A single
 // wrong range here is an SSRF hole, so the ranges are pinned by tests.
@@ -35,6 +36,20 @@ test('parseMessageSegments splits narration and dialogue', () => {
   assert.equal(segments[1].type, 'dialogue');
   assert.equal(segments[1].speakerName, 'ルナ');
   assert.equal(segments[1].isUser, false);
+});
+
+test('activeProfile picks the active one and falls back safely', () => {
+  const profiles = [
+    { id: 'a', name: '仕事', userName: 'タカシ', userBio: '' },
+    { id: 'b', name: '休日', userName: 'マスター', userBio: 'タメ口で' },
+  ];
+  const base = { ...DEFAULT_SETTINGS, profiles };
+
+  assert.equal(activeProfile({ ...base, activeProfileId: 'b' }).userName, 'マスター');
+  // Unknown id (e.g. a profile deleted on another tab) falls back to the first
+  assert.equal(activeProfile({ ...base, activeProfileId: 'gone' }).userName, 'タカシ');
+  // Empty library falls back to the built-in default
+  assert.equal(activeProfile({ ...base, profiles: [], activeProfileId: 'x' }).userName, 'ユーザー');
 });
 
 test('hasNarration finds narrator tags only when the tag is real', () => {

@@ -139,8 +139,8 @@ erDiagram
 
     USER_SETTINGS {
         string id PK "'default' 固定"
-        string userName "AIへの呼び名"
-        string userBio "システムプロンプトに注入"
+        string profiles "TalkProfile[] (id / name / userName / userBio)"
+        string activeProfileId "現在使っているプロフィール"
         string baseUrl "デフォルト /api/chat"
         string apiKey "平文 (BYOK)"
         string modelName

@@ -1,4 +1,4 @@
-import { Character, Message, UserSettings, TokenUsage } from './db';
+import { Character, Message, UserSettings, TokenUsage, activeProfile } from './db';
 import { hasNarration } from './message-parser';
 import { downloadJsonFile } from './utils';
 
@@ -56,12 +56,13 @@ function buildPromptMessages(
   const result: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
   // User Profile / Name instructions if provided
+  const profile = userSettings ? activeProfile(userSettings) : undefined;
   let userInfoPrompt = '';
-  if (userSettings?.userName && userSettings.userName.trim().length > 0) {
-    userInfoPrompt += `\n\n【対話相手（ユーザー）の情報】\n- ユーザーの呼び名/名前: ${userSettings.userName.trim()}`;
+  if (profile?.userName && profile.userName.trim().length > 0) {
+    userInfoPrompt += `\n\n【対話相手（ユーザー）の情報】\n- ユーザーの呼び名/名前: ${profile.userName.trim()}`;
   }
-  if (userSettings?.userBio && userSettings.userBio.trim().length > 0) {
-    userInfoPrompt += `\n- ユーザーに関する背景設定・要望: ${userSettings.userBio.trim()}`;
+  if (profile?.userBio && profile.userBio.trim().length > 0) {
+    userInfoPrompt += `\n- ユーザーに関する背景設定・要望: ${profile.userBio.trim()}`;
   }
 
   // A single concrete number is easier to follow than a range, and rolling it

@@ -32,6 +32,7 @@ interface ChatAreaProps {
   onOpenSettingsModal: () => void;
   onToggleMobileSidebar: () => void;
   onCharacterUpdated: () => void;
+  onSelectProfile: (id: string) => void;
 }
 
 export function ChatArea({
@@ -41,6 +42,7 @@ export function ChatArea({
   onOpenSettingsModal,
   onToggleMobileSidebar,
   onCharacterUpdated,
+  onSelectProfile,
 }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -565,6 +567,7 @@ export function ChatArea({
         onOpenSettingsModal={onOpenSettingsModal}
         onToggleMobileSidebar={onToggleMobileSidebar}
         onClearHistory={handleClearHistory}
+        onSelectProfile={onSelectProfile}
       />
 
       {/* Messages Scroll View */}

@@ -28,10 +28,18 @@ export interface Message {
   variantTokens?: TokenUsage[];
 }
 
+/** One "talk profile": who the user is in a conversation, switchable per chat. */
+export interface TalkProfile {
+  id: string;
+  name: string; // label shown in the switcher
+  userName: string; // what the character calls the user
+  userBio: string; // background / preferences injected into the prompt
+}
+
 export interface UserSettings {
   id: string; // 'default'
-  userName?: string;
-  userBio?: string;
+  profiles: TalkProfile[];
+  activeProfileId: string;
   baseUrl: string;
   apiKey: string;
   modelName: string;
@@ -56,10 +64,17 @@ class OpenZetaDB extends Dexie {
 
 export const db = new OpenZetaDB();
 
-export const DEFAULT_SETTINGS: UserSettings = {
+const DEFAULT_PROFILE: TalkProfile = {
   id: 'default',
+  name: 'デフォルト',
   userName: 'ユーザー',
   userBio: '',
+};
+
+export const DEFAULT_SETTINGS: UserSettings = {
+  id: 'default',
+  profiles: [DEFAULT_PROFILE],
+  activeProfileId: DEFAULT_PROFILE.id,
   baseUrl: '/api/chat', // Default to built-in proxy/Gemini or OpenAI format
   apiKey: '',
   modelName: 'gemini-2.5-flash',
@@ -182,9 +197,42 @@ export async function clearMessages(characterId: string, greeting?: string): Pro
   }
 }
 
+/** The profile in use right now; falls back to the first one, then the default. */
+export function activeProfile(settings: UserSettings): TalkProfile {
+  return (
+    settings.profiles?.find((p) => p.id === settings.activeProfileId) ??
+    settings.profiles?.[0] ??
+    DEFAULT_PROFILE
+  );
+}
+
+type LegacySettings = UserSettings & { userName?: string; userBio?: string };
+
 export async function getSettings(): Promise<UserSettings> {
-  const settings = await db.settings.get('default');
-  return settings || DEFAULT_SETTINGS;
+  const stored = (await db.settings.get('default')) as LegacySettings | undefined;
+  if (!stored) return DEFAULT_SETTINGS;
+  if (Array.isArray(stored.profiles) && stored.profiles.length > 0) return stored;
+
+  // Older versions kept a single userName/userBio pair; turn it into one profile.
+  const profile: TalkProfile = {
+    id: crypto.randomUUID(),
+    name: stored.userName?.trim() || 'デフォルト',
+    userName: stored.userName?.trim() || 'ユーザー',
+    userBio: stored.userBio || '',
+  };
+  const migrated: UserSettings = {
+    id: 'default',
+    profiles: [profile],
+    activeProfileId: profile.id,
+    baseUrl: stored.baseUrl || DEFAULT_SETTINGS.baseUrl,
+    apiKey: stored.apiKey || '',
+    modelName: stored.modelName || DEFAULT_SETTINGS.modelName,
+    temperature:
+      typeof stored.temperature === 'number' ? stored.temperature : DEFAULT_SETTINGS.temperature,
+    maxHistoryCount: stored.maxHistoryCount || DEFAULT_SETTINGS.maxHistoryCount,
+  };
+  await db.settings.put(migrated);
+  return migrated;
 }
 
 export async function saveSettings(settings: UserSettings): Promise<void> {

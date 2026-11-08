@@ -9,7 +9,7 @@ import {
   RotateCcw,
   Settings as SettingsIcon,
 } from 'lucide-react';
-import { Character, UserSettings } from '@/lib/db';
+import { Character, UserSettings, activeProfile } from '@/lib/db';
 import { exportCharacterToFile } from '@/lib/llm-client';
 import { AvatarImage } from '../AvatarImage';
 import { TokenUsagePopover } from './TokenUsagePopover';
@@ -33,6 +33,7 @@ interface ChatHeaderProps {
   onOpenSettingsModal: () => void;
   onToggleMobileSidebar: () => void;
   onClearHistory: () => void;
+  onSelectProfile: (id: string) => void;
 }
 
 export const ChatHeader = React.memo(function ChatHeader({
@@ -47,6 +48,7 @@ export const ChatHeader = React.memo(function ChatHeader({
   onOpenSettingsModal,
   onToggleMobileSidebar,
   onClearHistory,
+  onSelectProfile,
 }: ChatHeaderProps) {
   return (
     <header
@@ -91,6 +93,22 @@ export const ChatHeader = React.memo(function ChatHeader({
 
       {/* Right Action Tools */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Talk profile switcher */}
+        <select
+          id="profile-switcher"
+          value={activeProfile(settings).id}
+          onChange={(e) => onSelectProfile(e.target.value)}
+          className="hidden sm:block max-w-[110px] px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-800/80 text-zinc-300 text-xs cursor-pointer focus:outline-none focus:border-indigo-500/50"
+          title="トークプロフィールを切り替え"
+          aria-label="トークプロフィールを切り替え"
+        >
+          {settings.profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name || '(無題)'}
+            </option>
+          ))}
+        </select>
+
         {/* Token Usage Stats Popover */}
         <TokenUsagePopover
           stats={conversationStats}
