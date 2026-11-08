@@ -69,4 +69,8 @@ test('parseMessageSegments strips thoughts and falls back without tags', () => {
   assert.equal(plain.length, 1);
   assert.equal(plain[0].isUser, true);
   assert.equal(plain[0].speakerName, 'ユーザー');
+
+  // The active talk profile names the user in the transcript
+  const named = parseMessageSegments('こんにちは', 'ルナ', 'user', 'マスター');
+  assert.equal(named[0].speakerName, 'マスター');
 });

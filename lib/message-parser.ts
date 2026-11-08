@@ -83,7 +83,8 @@ function formatDialogueAsterisks(text: string): string {
 export function parseMessageSegments(
   rawContent: string,
   characterName: string,
-  defaultRole: 'user' | 'assistant' | 'system'
+  defaultRole: 'user' | 'assistant' | 'system',
+  userName = 'ユーザー'
 ): MessageSegment[] {
   if (!rawContent) return [];
 
@@ -116,7 +117,7 @@ export function parseMessageSegments(
       {
         id: 'seg-0',
         type: 'dialogue',
-        speakerName: 'ユーザー',
+        speakerName: userName,
         isUser: true,
         content: formatDialogueAsterisks(trimmed),
       },
@@ -203,7 +204,7 @@ export function parseMessageSegments(
       if (trimmedLine) {
         const isUser = defaultRole === 'user';
         currentType = 'dialogue';
-        currentSpeaker = isUser ? 'ユーザー' : characterName;
+        currentSpeaker = isUser ? userName : characterName;
         currentUser = isUser;
         currentLines = [line];
         hasActiveSegment = true;

@@ -11,6 +11,7 @@ import {
   Message,
   UserSettings,
   TokenUsage,
+  activeProfile,
   addMessage,
   getMessages,
   clearMessages,
@@ -44,6 +45,7 @@ export function ChatArea({
   onCharacterUpdated,
   onSelectProfile,
 }: ChatAreaProps) {
+  const userName = activeProfile(settings).userName;
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
@@ -589,6 +591,7 @@ export function ChatArea({
               key={msg.id}
               message={msg}
               character={character}
+              userName={userName}
               isLatestAssistant={isLatestAssistant}
               copiedMsgId={copiedMsgId}
               isStreamingActive={isThisStreaming}

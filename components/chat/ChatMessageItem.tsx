@@ -11,6 +11,7 @@ import { AvatarImage } from '../AvatarImage';
 interface ChatMessageItemProps {
   message: Message;
   character: Character;
+  userName: string;
   isLatestAssistant: boolean;
   copiedMsgId: string | null;
   isStreamingActive?: boolean;
@@ -43,6 +44,7 @@ export const ChatMessageItem = React.memo(
   function ChatMessageItem({
     message,
     character,
+    userName,
     isLatestAssistant,
     copiedMsgId,
     isStreamingActive = false,
@@ -95,8 +97,8 @@ export const ChatMessageItem = React.memo(
     if (isViewingStreamingVariant && !currentContent.trim()) {
       return [];
     }
-    return parseMessageSegments(currentContent, character.name, message.role);
-  }, [currentContent, character.name, message.role, isViewingStreamingVariant]);
+    return parseMessageSegments(currentContent, character.name, message.role, userName);
+  }, [currentContent, character.name, message.role, userName, isViewingStreamingVariant]);
 
   const currentTokens = useMemo(() => {
     if (isViewingStreamingVariant) {
@@ -173,7 +175,7 @@ export const ChatMessageItem = React.memo(
               className="flex flex-col items-end ml-auto max-w-[88%] sm:max-w-xl lg:max-w-2xl animate-in fade-in duration-150"
             >
               <div className="flex items-center gap-1.5 mb-1 mr-1 text-xs text-zinc-400 font-medium">
-                <span>{seg.speakerName || 'あなた'}</span>
+                <span>{seg.speakerName || userName}</span>
                 <div className="w-5 h-5 rounded-full bg-zinc-700 text-zinc-300 flex items-center justify-center text-[9px] font-bold shadow-xs">
                   ME
                 </div>
@@ -309,6 +311,7 @@ export const ChatMessageItem = React.memo(
   a.isStreamingActive === b.isStreamingActive &&
   a.streamingContent === b.streamingContent &&
   a.isLatestAssistant === b.isLatestAssistant &&
+  a.userName === b.userName &&
   (a.copiedMsgId === a.message.id) === (b.copiedMsgId === b.message.id) &&
   a.character.id === b.character.id &&
   a.character.name === b.character.name &&
