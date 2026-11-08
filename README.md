@@ -200,6 +200,18 @@ Server (Next.js API Routes)
 
 ---
 
+## バージョニング
+
+[Semantic Versioning](https://semver.org/lang/ja/) に従います。`0.x` の間は破壊的変更が入る可能性があります。
+
+- リリースは git タグ `vX.Y.Z` で切り、`package.json` の `version` と一致させます
+- 修正のみ: `X.Y.Z+1` / 機能追加: `X.Y+1.0` / 破壊的変更: `X+1.0.0`
+- Docker イメージはタグから自動ビルドされます:
+  `ghcr.io/croudgoat/openzeta:X.Y.Z`（バージョン固定）と `:latest`（main の最新）
+- 本番では `:latest` ではなくバージョン固定タグを推奨します
+
+---
+
 ## 開発
 
 ```bash
