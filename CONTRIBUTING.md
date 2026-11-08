@@ -55,10 +55,10 @@ docker compose up -d  # Docker で起動
 ### コミット前の確認
 
 ```bash
-npx tsc --noEmit && npm run lint && npm run build
+npm test && npx tsc --noEmit && npm run lint && npm run build
 ```
 
-3 つとも通る状態を保ってください。
+すべて通る状態を保ってください。
 
 ---
 

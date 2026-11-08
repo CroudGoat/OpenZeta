@@ -12,13 +12,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "clean": "next clean"
-  },
-  "allowScripts": {
-    "@google/genai": true,
-    "protobufjs": true,
-    "unrs-resolver": true,
-    "sharp": true
+    "test": "node --test test/core.test.ts"
   },
   "overrides": {
     "next": {
@@ -32,16 +26,13 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
-    "clsx": "^2.1.1",
     "dexie": "^4.0.11",
     "lucide-react": "^0.475.0",
-    "motion": "^12.23.24",
     "next": "^15.2.0",
     "postcss": "^8.5.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-markdown": "^10.0.0",
-    "tailwind-merge": "^3.0.2"
+    "react-markdown": "^10.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.9",

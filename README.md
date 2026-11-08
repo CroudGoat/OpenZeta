@@ -206,6 +206,7 @@ Server (Next.js API Routes)
 npm run dev     # 開発サーバー
 npm run build   # 本番ビルド
 npm run lint    # ESLint
+npm test        # テスト (Node.js 22 以上)
 npx tsc --noEmit # 型チェック
 ```
 

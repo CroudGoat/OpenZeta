@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
         messages,
         temperature,
         stream: true,
-        timeoutMs: 120_000,
       });
     } catch (error) {
       const { status, message } = externalFetchErrorStatus(error);

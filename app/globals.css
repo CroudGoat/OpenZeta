@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @layer base {
   :root {
@@ -48,3 +50,8 @@
   background: rgba(113, 113, 122, 0.45);
 }
 
+/* Long conversations: skip layout/paint for messages scrolled out of view */
+#chat-messages-container > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}

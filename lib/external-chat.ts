@@ -119,7 +119,7 @@ export async function fetchExternalChatCompletion(
     ? check.url
     : `${check.url.replace(/\/+$/, '')}/chat/completions`;
 
-  return fetch(targetUrl, {
+  const response = await fetch(targetUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -133,8 +133,19 @@ export async function fetchExternalChatCompletion(
       ...(options.stream ? { stream_options: { include_usage: true } } : {}),
       ...options.extraBody,
     }),
-    signal: AbortSignal.timeout(options.timeoutMs ?? 120_000),
+    // The SSRF check only covers the first hop, so a redirect could be used to
+    // reach an internal address. Refuse them instead of following.
+    redirect: 'manual',
+    // shortcut: one hard 10 min cap covers the whole stream; a slower generation is cut off.
+    signal: AbortSignal.timeout(options.timeoutMs ?? 600_000),
   });
+
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel();
+    throw new ExternalUrlError('The endpoint returned a redirect, which is not allowed.');
+  }
+
+  return response;
 }
 
 /**

@@ -160,6 +160,9 @@ function CharacterFormModal({
     >
       <div
         id="character-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="キャラクター設定"
         className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[#0c0c0e] text-zinc-100 rounded-2xl shadow-2xl border border-zinc-800 overflow-hidden"
       >
         {/* Header */}

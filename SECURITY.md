@@ -42,6 +42,7 @@ GitHub の [Security Advisories](https://github.com/CroudGoat/OpenZeta/security/
   リンクローカル・マルチキャスト・予約範囲でないことを検証
   （IPv4/IPv6 双方、IPv4-mapped アドレスも対象）
 - localhost / *.local / *.internal / クラウドメタデータホスト名の早期拒否
+- リダイレクトは追わない（最初のホップだけ検証すると 302 で内部アドレスへ飛ばせるため）
 - 解決不能・タイムアウト（5秒）も拒否
 - 外部エンドポイントへの fetch にハードタイムアウトを追加
   （チャット 120 秒 / スマートリプライ 30 秒 → 504）

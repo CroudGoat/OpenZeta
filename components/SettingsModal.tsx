@@ -106,6 +106,8 @@ function SettingsFormModal({
         }),
       });
 
+      await res.body?.cancel();
+
       if (res.ok) {
         setTestStatus('success');
         setTestMessage('接続成功！ストリーミングAPIの動作を確認しました。');
@@ -265,6 +267,9 @@ function SettingsFormModal({
     >
       <div
         id="settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="環境設定"
         className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-[#0c0c0e] text-zinc-100 rounded-2xl shadow-2xl border border-zinc-800 overflow-hidden"
       >
         {/* Header */}

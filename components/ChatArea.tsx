@@ -102,22 +102,25 @@ export function ChatArea({
     };
   }, [messages]);
 
-  // Load messages when character changes
+  // Reload messages only when the selected character (or its greeting) changes.
+  // Depending on the whole `character` object would re-run this on every
+  // refreshData() and abort an in-flight stream when the user saves an edit.
+  const characterId = character?.id;
+  const characterGreeting = character?.greeting;
+
   useEffect(() => {
-    if (!character) return;
+    if (!characterId) return;
 
     let isMounted = true;
-    const charId = character.id;
-    const charGreeting = character.greeting;
 
-    getMessages(charId).then((loaded) => {
+    getMessages(characterId).then((loaded) => {
       if (!isMounted) return;
-      if (loaded.length === 0 && charGreeting) {
+      if (loaded.length === 0 && characterGreeting) {
         const initialGreetingMsg: Message = {
-          id: `initial-greeting-${charId}`,
-          characterId: charId,
+          id: `initial-greeting-${characterId}`,
+          characterId,
           role: 'assistant',
-          content: charGreeting,
+          content: characterGreeting,
           createdAt: Date.now(),
         };
         addMessage(initialGreetingMsg).then(() => {
@@ -142,7 +145,7 @@ export function ChatArea({
         rafIdRef.current = null;
       }
     };
-  }, [character]);
+  }, [characterId, characterGreeting]);
 
   // High-performance scroll to bottom
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -190,9 +193,13 @@ export function ChatArea({
 
   // Actions
   const handleCopyMessage = useCallback((id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedMsgId(id);
-    setTimeout(() => setCopiedMsgId(null), 2000);
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopiedMsgId(id);
+        setTimeout(() => setCopiedMsgId(null), 2000);
+      })
+      .catch((err) => console.error('Copy failed:', err));
   }, []);
 
   const handleDeleteSingleMessage = useCallback(async (msgId: string) => {
@@ -363,8 +370,11 @@ export function ChatArea({
       return;
     }
 
-    // Aborted with no content: leave the (empty) placeholder as is
-    if (outcome.status === 'aborted' && outcome.content === '') return;
+    // Aborted with no content: drop the placeholder so no empty row is left behind
+    if (outcome.status === 'aborted' && outcome.content === '') {
+      setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
+      return;
+    }
 
     // 4. Save completed assistant message to Dexie
     const finalAssistantMsg: Message = {
@@ -486,7 +496,17 @@ export function ChatArea({
       console.error('Chat regenerate error:', outcome.error);
       return;
     }
-    if (outcome.status === 'aborted' && outcome.content === '') return;
+    if (outcome.status === 'aborted' && outcome.content === '') {
+      // Revert the in-flight variant pointer, or drop a freshly created placeholder
+      setMessages((prev) =>
+        currentVariants.length === 0
+          ? prev.filter((m) => m.id !== inFlightTargetMsg.id)
+          : prev.map((m) =>
+              m.id === inFlightTargetMsg.id ? { ...m, variantIndex: currentVariants.length - 1 } : m
+            )
+      );
+      return;
+    }
 
     const newVariants = [...currentVariants, outcome.content];
     const newVariantIndex = newVariants.length - 1;

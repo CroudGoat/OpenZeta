@@ -144,10 +144,6 @@ export async function getCharacters(): Promise<Character[]> {
   return await db.characters.orderBy('updatedAt').reverse().toArray();
 }
 
-export async function getCharacter(id: string): Promise<Character | undefined> {
-  return await db.characters.get(id);
-}
-
 export async function saveCharacter(char: Character): Promise<void> {
   await db.characters.put(char);
 }
