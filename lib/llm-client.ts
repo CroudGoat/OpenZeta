@@ -79,7 +79,15 @@ function buildPromptMessages(
 - @${character.name}: キャラクターの発言および行動
   例: @${character.name}: おはよう！ *ふっと柔らかく微笑みながら手を振り返す* 今日も会えて嬉しいな。
 - @ナレーター: シーン全体の情景描写、環境音、第三者視点の地の文
-  例: @ナレーター: 窓から柔らかな朝の光が差し込み、静かな部屋を温かく照らしている。`;
+  例: @ナレーター: 窓から柔らかな朝の光が差し込み、静かな部屋を温かく照らしている。
+
+【1回の返答の文量（厳守）】
+1回の返答には、次のブロックをこの回数範囲で含めてください。
+- @${character.name}: （キャラクターのセリフと行動）… 2回〜4回
+- @ナレーター: （情景・状況の描写）… 1回〜3回
+各ブロックは1〜3文程度にまとめ、同じ話者のブロックが続けて並ばないように
+ナレーションを挟んでテンポよく構成してください。
+セリフだけで終わらせず、必ず情景描写を1回以上含めてください。`;
 
   // If the last two replies had no narration, make this turn produce one so the
   // scene description does not disappear for long stretches.
